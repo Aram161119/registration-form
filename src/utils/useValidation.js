@@ -1,63 +1,111 @@
 import { useState } from 'react';
 
-const initialValues = {
-	email: [],
-	password: [],
-	confirmPassword: [],
+// Default error messages
+const defaultMessages = {
+	required: 'This field is required',
+	min: (param) => `Minimum ${param} characters required`,
+	max: (param) => `Maximum ${param} characters allowed`,
+	email: 'Invalid email address',
+	match: 'Values do not match',
 };
 
-const useValidation = () => {
-	const [errors, setErrors] = useState(initialValues);
+// Built-in validators
+const validators = {
+	required: (value) => !!value,
+	min: (value, param) => value?.length >= Number(param),
+	max: (value, param) => value?.length <= Number(param),
+	email: (value) => /\S+@\S+\.\S+/.test(value),
+	match: (value, param, allValues) => {
+		if (!allValues[param]) {
+			return true;
+		}
+
+		return value === allValues[param];
+	},
+};
+
+function parseValidationString(validationString) {
+	return validationString.split('|').map((rule) => {
+		const [name, param] = rule.split(':');
+		return { name, param };
+	});
+}
+
+export default function useFormValidation(validationSchema) {
+	const [errors, setErrors] = useState({});
+
+	const getErrorMessage = (field, ruleName, param) => {
+		const fieldSchema = validationSchema[field];
+		const customMessage = fieldSchema?.messages?.[ruleName];
+
+		if (customMessage) return customMessage;
+
+		const defaultMsg = defaultMessages[ruleName];
+		return typeof defaultMsg === 'function' ? defaultMsg(param) : defaultMsg;
+	};
+
+	const validateField = (field, value, values) => {
+		const newErrors = {};
+		let transformedErrors = { ...errors };
+
+		const fieldRule = validationSchema[field];
+
+		if (!fieldRule || !fieldRule.validation) return false;
+
+		const parsedRules = parseValidationString(fieldRule.validation);
+
+		for (let { name: ruleName, param } of parsedRules) {
+			const validator = validators[ruleName];
+
+			if (validator) {
+				const isValid = validator(value, param, values);
+
+				if (!isValid) {
+					const error = getErrorMessage(field, ruleName, param);
+					newErrors[field] = newErrors[field] || [];
+					newErrors[field].push({ [ruleName]: error });
+				} else if (ruleName === 'match' && param) {
+					// Clean up previous 'match' errors on the referenced param field
+					const matchErrors = transformedErrors[param];
+
+					if (Array.isArray(matchErrors)) {
+						const filtered = matchErrors.filter(
+							(errorObj) => !errorObj.hasOwnProperty('match'),
+						);
+
+						if (filtered.length > 0) {
+							transformedErrors[param] = filtered;
+						} else {
+							delete transformedErrors[param];
+						}
+					}
+				}
+			}
+		}
+
+		const isValidField = Object.keys(newErrors).length === 0;
+
+		if (isValidField) {
+			delete transformedErrors[field];
+		} else {
+			transformedErrors = { ...errors, ...newErrors };
+		}
+
+		const isValidForm = Object.keys(transformedErrors).length === 0;
+
+		setErrors({ ...transformedErrors });
+
+		return { isValidField, isValidForm };
+	};
+
+	const isValid = Object.keys(errors).length === 0;
+
+	const clearErrors = () => setErrors({});
 
 	return {
-		getErrors: () => errors,
-		resetValidationState: () => setErrors(initialValues),
-		validateEmail: (value) => {
-			let newEmailError = [];
-
-			if (!value.length) {
-				newEmailError.push('Email is required field!');
-			} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
-				newEmailError.push('Please enter a valid email (e.g. name@example.com)');
-			} else if (value.length > 30) {
-				newEmailError.push('Invalid email: must not exceed 30 characters.');
-			} else if (value.length < 5) {
-				newEmailError.push('Invalid email: must be at least 5 characters long.');
-			}
-
-			setErrors({ ...errors, email: newEmailError });
-		},
-		validatePassword: (value) => {
-			let newPasswordError = [];
-
-			if (!value.length) {
-				newPasswordError.push('Password is required field!');
-			} else if (value.length > 20) {
-				newPasswordError.push('Invalid password: must not exceed 20 characters.');
-			} else if (value.length < 5) {
-				newPasswordError.push(
-					'Invalid password: must be at least 5 characters long.',
-				);
-			}
-
-			setErrors({ ...errors, password: newPasswordError });
-		},
-		validateConfirmPassword: (value, checkValue) => {
-			let newConfirmPasswordError = [];
-
-			if (!value.length) {
-				newConfirmPasswordError.push('Confirm password is required field!');
-			} else if (value !== checkValue) {
-				newConfirmPasswordError.push('Passwords do not match.');
-			}
-
-			setErrors({ ...errors, confirmPassword: newConfirmPasswordError });
-		},
-		isValid:
-			!errors.email.length &&
-			!errors.password.length &&
-			!errors.confirmPassword.length,
+		errors,
+		validateField,
+		clearErrors,
+		isValid,
 	};
-};
-
-export default useValidation;
+}

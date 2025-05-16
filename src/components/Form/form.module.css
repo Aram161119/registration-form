@@ -1,0 +1,46 @@
+.form {
+	display: flex;
+	flex-direction: column;
+	width: 360px;
+	gap: 16px;
+	padding: 24px;
+	border: 1px solid #1daff5;
+	border-radius: 4px;
+	background-color: #ecf7ff;
+}
+
+.miniBlock {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+input {
+	padding: 12px 4px;
+	border-radius: 7px;
+	border: 1px solid #1daff5;
+	font-size: 14px;
+	font-family: cursive;
+}
+
+button {
+	padding: 16px;
+	background: azure;
+	border: 1px solid #1daff5;
+	border-radius: 12px;
+	cursor: pointer;
+	color: #1774b7;
+	font-size: 18px;
+	font-weight: 600;
+	font-family: cursive;
+}
+
+button:hover {
+	background: #d0e5e5;
+}
+
+button:disabled {
+	background: #e3e3e3;
+	color: #fff;
+	cursor: unset;
+}

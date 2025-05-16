@@ -10,8 +10,8 @@ const useStore = () => {
 	const [state, setState] = useState(initialValues);
 
 	return {
-		updateState: (name, value) => setState({ ...state, [name]: value }),
-		getState: () => state,
+		updateState: (name, value) => setState((prev) => ({ ...prev, [name]: value })),
+		state,
 		resetState: () => setState(initialValues),
 	};
 };
