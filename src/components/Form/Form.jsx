@@ -1,137 +1,95 @@
-import { useRef, useState } from 'react';
-import { useStore, useValidation } from '@/utils';
-import ErrorMessages from '@/components/ErrorMessages/ErorMessages';
 import styles from './form.module.css';
+import { useForm } from 'react-hook-form';
 import Label from '@/UI/Label/Label';
+import ErrorMessages from '@/components/ErrorMessages/ErorMessages';
+import { useEffect, useRef } from 'react';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 
 const postRequest = async (data) => {
 	console.log('Sent data', data);
 };
 
-const validationSchema = {
-	email: {
-		validation: 'required|email|min:5|max:30',
-		messages: {
-			required: 'Email is required',
-			email: 'Please enter a valid email address',
-			min: 'Email must be at least 4 characters',
-			max: 'Email must be 30 characters max',
-		},
-	},
-	password: {
-		validation: 'required|min:4|max:20|match:confirmPassword',
-		messages: {
-			required: 'Password is required',
-			min: 'Password must be at least 4 characters',
-			max: 'Password must be 30 characters max',
-		},
-	},
-	confirmPassword: {
-		validation: 'required|match:password',
-		messages: {
-			required: 'Please confirm your password',
-			match: 'Passwords do not match',
-		},
-	},
-};
+const schema = yup.object().shape({
+	email: yup
+		.string()
+		.email('Please enter a valid email address')
+		.min(5, 'Email must be at least 5 characters')
+		.max(30, 'Email must be 30 characters max')
+		.required('Email is required'),
+	password: yup
+		.string()
+		.min(4, 'Password must be at least 4 characters')
+		.max(20, 'Password must be 20 characters max')
+		.required('Password is required'),
+	confirmPassword: yup
+		.string()
+		.oneOf([yup.ref('password')], 'Passwords do not match')
+		.required('Confirm password is required'),
+});
 
 const Form = () => {
-	const buttonRef = useRef(null);
-	const [showErrors, setShowErrors] = useState({
-		email: false,
-		password: false,
-		confirmPassword: false,
+	const {
+		register,
+		handleSubmit,
+		formState: { errors, isValid, touchedFields },
+		watch,
+		trigger,
+		reset,
+	} = useForm({
+		defaultValues: {
+			email: '',
+			password: '',
+			confirmPassword: '',
+		},
+		mode: 'onChange',
+		criteriaMode: 'all',
+		resolver: yupResolver(schema),
 	});
 
-	const { resetState, updateState, state } = useStore();
-	const { errors, validateField, clearErrors, isValid } =
-		useValidation(validationSchema);
+	const submitRef = useRef(null);
 
-	const { email, password, confirmPassword } = state;
-	const formHasEmptyField = !email || !password || !confirmPassword;
+	const password = watch('password');
 
-	const handleChange = ({ name, value }) => {
-		const { isValidForm: isValidForm } = validateField(name, value, state);
+	useEffect(() => {
+		trigger('confirmPassword');
+	}, [password]);
 
-		if (!formHasEmptyField && isValidForm) {
-			clearErrors();
-
-			// Use setTimeout to wait for DOM updates,
-			// otherwise focus() might be called before the element is rendered
+	useEffect(() => {
+		if (isValid) {
 			setTimeout(() => {
-				buttonRef.current?.focus();
+				submitRef.current?.focus();
 			}, 0);
 		}
+	}, [isValid]);
 
-		updateState(name, value);
-	};
-
-	const showError = (name) => {
-		const newArr = {};
-		newArr[name] = true;
-
-		setShowErrors({ ...showErrors, ...newArr });
-	};
-
-	const handleSubmit = (e) => {
-		e.preventDefault();
-		postRequest(state);
-		resetState();
+	const onSubmit = (data) => {
+		postRequest(data);
+		reset();
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className={styles.form} noValidate>
-			{showErrors?.email && <ErrorMessages errors={errors?.email ?? []} />}
-			<div className={styles.miniBlock}>
-				<Label name={'email'}>Email *</Label>
-				<input
-					type="email"
-					id="email"
-					name="email"
-					placeholder="Email is required"
-					value={email}
-					onChange={(e) => handleChange(e.target)}
-					onBlur={(e) => showError(e.target.name)}
-				/>
-			</div>
-
-			<div className={styles.miniBlock}>
-				{showErrors?.password && (
-					<ErrorMessages errors={errors?.password ?? []} />
-				)}
-				<Label name={'Password'}>Password *</Label>
-				<input
-					type="password"
-					id="password"
-					name="password"
-					placeholder="Password is required"
-					value={password}
-					onChange={(e) => handleChange(e.target)}
-					onBlur={(e) => showError(e.target.name)}
-				/>
-			</div>
-
-			<div className={styles.miniBlock}>
-				{showErrors?.confirmPassword && (
-					<ErrorMessages errors={errors?.confirmPassword ?? []} />
-				)}
-				<Label name={'confirmPassword'}>Confirm Password *</Label>
-				<input
-					type="password"
-					id="confirmPassword"
-					name="confirmPassword"
-					placeholder="Confirm password is required"
-					value={confirmPassword}
-					onChange={(e) => handleChange(e.target)}
-					onBlur={(e) => showError(e.target.name)}
-				/>
-			</div>
-
-			<button
-				ref={buttonRef}
-				type="submit"
-				disabled={formHasEmptyField || !isValid}
-			>
+		<form onSubmit={handleSubmit(onSubmit)} className={styles.form} noValidate>
+			<Label name={'email'}>Email</Label>
+			<input type="email" placeholder="Email is required" {...register('email')} />
+			{touchedFields.email && <ErrorMessages errors={errors} name="email" />}
+			<Label name={'password'}>Password</Label>
+			<input
+				type="password"
+				placeholder="Password is required"
+				{...register('password')}
+			/>
+			{touchedFields.password && <ErrorMessages errors={errors} name="password" />}
+			<Label name={'confirmPassword'}>Confirm password</Label>
+			<input
+				type="password"
+				placeholder="Confirm password is required"
+				{...register('confirmPassword')}
+			/>
+			{touchedFields.confirmPassword && (
+				<ErrorMessages errors={errors} name="confirmPassword" />
+			)}
+			<button ref={submitRef} type="submit" disabled={!isValid}>
 				Send
 			</button>
 		</form>
